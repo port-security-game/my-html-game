@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=1.0">
+  <title>命令拼图 · 拼出你的安全盾 | 交换机端口安全</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0a0f1c 0%, #121a2b 100%);
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      color: #e0f0ff;
+      overflow: hidden;
+    }
+
+    .game-wrapper {
+      width: 1100px;
+      max-width: 100%;
+      height: calc(100vh - 24px);
+      background: rgba(10, 20, 35, 0.85);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(0, 180, 255, 0.3);
+      border-radius: 26px;
+      padding: 16px 18px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 70px rgba(0, 160, 255, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .game-title {
+      text-align: center;
+      font-size: 1.7rem;
+      font-weight: 700;
+      background: linear-gradient(to right, #7ec8ff, #b3e0ff, #4da6ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px rgba(0, 160, 255, 0.5);
+      flex-shrink: 0;
+    }
+
+    .levels-nav {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .level-btn {
+      background: transparent;
+      border: 1px solid #2d5570;
+      color: #9bc3e6;
+      padding: 8px 18px;
+      border-radius: 24px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(5px);
+    }
+
+    .level-btn:hover {
+      border-color: #3d9ed6;
+      color: #d2edff;
+      background: rgba(15, 55, 110, 0.4);
+      box-shadow: 0 0 12px #005faa;
+    }
+
+    .level-btn.active {
+      background: #0b2f4a;
+      border-color: #00a6ff;
+      color: white;
+      box-shadow: 0 0 20px #0080ff;
+      transform: translateY(-1px);
+    }
+
+    .main-area {
+      display: flex;
+      gap: 14px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .terminal-panel {
+      flex: 6;
+      background: #0b121f;
+      border-radius: 16px;
+      border: 1px solid #1f4560;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7);
+      overflow-y: auto;
+    }
+
+    .terminal-header {
+      color: #5b82a0;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      border-bottom: 1px dashed #2a465a;
+      padding-bottom: 6px;
+      flex-shrink: 0;
+    }
+
+    .slots-container {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex: 1;
+    }
+
+    .slot {
+      background: #0d1725;
+      border: 2px dashed #2b4b64;
+      border-radius: 10px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 5px 10px;
+      color: #5f7d94;
+      font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+      font-size: 0.82rem;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      gap: 4px;
+      cursor: default;
+      position: relative;
+      z-index: 1;
+    }
+
+    .slot.drag-over {
+      border-color: #00b7ff;
+      background: rgba(0, 150, 255, 0.15);
+      box-shadow: 0 0 18px #004c99;
+    }
+
+    .slot.filled {
+      border-style: solid;
+      border-color: #1f6785;
+      background: #0e2232;
+    }
+
+    .slot.success-flash {
+      animation: successPulse 0.5s ease;
+    }
+
+    .slot.error-shake {
+      animation: shake 0.4s ease, errorGlow 0.8s ease;
+    }
+
+    .slot-number {
+      color: #2f5568;
+      font-weight: bold;
+      font-size: 0.85rem;
+      min-width: 22px;
+      flex-shrink: 0;
+    }
+
+    /* 关键修复：chip不阻挡拖放事件 */
+    .slot .chip {
+      display: inline-flex;
+      align-items: center;
+      background: #1a3550;
+      border: 1px solid #3a6990;
+      color: #cae4ff;
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.78rem;
+      gap: 5px;
+      transition: 0.15s;
+      pointer-events: none;
+      /* 让拖放事件穿透到槽位 */
+      user-select: none;
+    }
+
+    .slot .chip .remove-x {
+      font-weight: bold;
+      color: #ff7b7b;
+      font-size: 0.9rem;
+      line-height: 1;
+      cursor: pointer;
+      pointer-events: auto;
+      /* 只有移除按钮可点击 */
+      z-index: 2;
+      padding: 2px 4px;
+      margin-left: 2px;
+    }
+
+    .slot .chip .remove-x:hover {
+      color: #ff4444;
+      background: rgba(255, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    .slot-placeholder {
+      color: #3d5a72;
+      font-style: italic;
+      font-size: 0.78rem;
+      pointer-events: none;
+    }
+
+    .info-panel {
+      flex: 4;
+      background: rgba(8, 20, 35, 0.7);
+      border-radius: 16px;
+      border: 1px solid #204a64;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      backdrop-filter: blur(8px);
+      overflow-y: auto;
+    }
+
+    .stat-box {
+      background: #0b1a2a;
+      border-radius: 12px;
+      padding: 10px 12px;
+      border: 1px solid #2e5270;
+    }
+
+    .stat-label {
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      color: #5d85a5;
+      letter-spacing: 1.2px;
+      margin-bottom: 3px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(to bottom, #e0f0ff, #8ecaff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .level-desc {
+      font-size: 0.83rem;
+      color: #b0d0f0;
+      line-height: 1.4;
+    }
+
+    .scene-desc {
+      font-size: 0.78rem;
+      color: #ffd966;
+      background: #1a2a38;
+      border-radius: 8px;
+      padding: 5px 8px;
+      margin: 2px 0;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+
+    .btn {
+      background: #102b3f;
+      border: 1px solid #2a597a;
+      color: #d3eaff;
+      padding: 7px 14px;
+      border-radius: 22px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.2s;
+      letter-spacing: 0.5px;
+      font-size: 0.83rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn:hover {
+      background: #1a425c;
+      border-color: #3e90c0;
+      color: white;
+      box-shadow: 0 0 10px #0077cc;
+    }
+
+    .btn-primary {
+      background: #005f99;
+      border-color: #00a6ff;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #0077cc;
+    }
+
+    .block-pool {
+      background: rgba(0, 15, 30, 0.6);
+      border: 1px dashed #2c5f7a;
+      border-radius: 14px;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+      min-height: 44px;
+      backdrop-filter: blur(5px);
+      flex-shrink: 0;
+      overflow-y: auto;
+      max-height: 100px;
+    }
+
+    .pool-title {
+      width: 100%;
+      color: #6d94b5;
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 1px;
+    }
+
+    .cmd-block {
+      background: #0e1e2e;
+      border: 1px solid #3f637d;
+      color: #cae2ff;
+      padding: 7px 12px;
+      border-radius: 10px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.78rem;
+      cursor: grab;
+      user-select: none;
+      transition: 0.2s;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+      white-space: nowrap;
+    }
+
+    .cmd-block:active {
+      cursor: grabbing;
+    }
+
+    .cmd-block.dragging {
+      opacity: 0.25;
+      transform: scale(0.9);
+    }
+
+    .cmd-block.used {
+      opacity: 0.35;
+      cursor: not-allowed;
+      background: #162a38;
+      border-color: #2a4455;
+      color: #7a94a8;
+      text-decoration: line-through 2px rgba(255, 255, 255, 0.2);
+      pointer-events: none;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(6px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      visibility: hidden;
+      opacity: 0;
+      transition: 0.3s;
+    }
+
+    .modal-overlay.show {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal-box {
+      background: #0b1b2e;
+      border: 1px solid #00a6ff;
+      border-radius: 22px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 0 50px #006eff;
+      max-width: 370px;
+      width: 90%;
+    }
+
+    .modal-box h2 {
+      color: #ffd966;
+      margin-bottom: 10px;
+      font-size: 1.5rem;
+    }
+
+    .key-text {
+      font-size: 1.1rem;
+      font-family: monospace;
+      background: #021018;
+      padding: 8px 16px;
+      border-radius: 10px;
+      color: #9bffb2;
+      letter-spacing: 2px;
+      margin: 12px 0;
+      border: 1px solid #2f6a4a;
+    }
+
+    @keyframes shake {
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+      20% {
+        transform: translateX(-5px);
+      }
+      40% {
+        transform: translateX(5px);
+      }
+      60% {
+        transform: translateX(-3px);
+      }
+      80% {
+        transform: translateX(3px);
+      }
+    }
+
+    @keyframes errorGlow {
+      0% {
+        box-shadow: 0 0 6px red;
+      }
+      100% {
+        box-shadow: 0 0 16px red;
+      }
+    }
+
+    @keyframes successPulse {
+      0% {
+        box-shadow: 0 0 4px #2ecc71;
+      }
+      50% {
+        box-shadow: 0 0 20px #2ecc71;
+      }
+      100% {
+        box-shadow: 0 0 4px #2ecc71;
+      }
+    }
+
+    @media (max-width: 750px) {
+      .main-area {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrapper">
+    <h1 class="game-title">⚙️ 命令拼图 · 拼出你的安全盾</h1>
+
+    <div class="levels-nav" id="levelNav">
+      <button class="level-btn active" data-level="0">🔢 关卡1 · 最大MAC数</button>
+      <button class="level-btn" data-level="1">📌 关卡2 · 静态绑定</button>
+      <button class="level-btn" data-level="2">🧲 关卡3 · 粘滞绑定</button>
+      <button class="level-btn" data-level="3">🚨 关卡4 · 违规模式</button>
+    </div>
+
+    <div class="main-area">
+      <div class="terminal-panel">
+        <div class="terminal-header">Switch> 命令行</div>
+        <div class="slots-container" id="slotsContainer"></div>
+      </div>
+
+      <div class="info-panel">
+        <div class="stat-box">
+          <div class="stat-label">⏱️ 计时器</div>
+          <div class="stat-value" id="timerDisplay">00:00</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">🏆 得分</div>
+          <div class="stat-value" id="scoreDisplay">0</div>
+        </div>
+        <div class="level-desc" id="levelDescription"></div>
+        <div id="sceneArea"></div>
+        <div class="btn-group">
+          <button class="btn" id="resetBtn">🔄 重置关卡</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="block-pool" id="blockPool">
+      <div class="pool-title">🧩 可用命令块（拖拽到左侧槽位）</div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-box">
+      <h2>🔐 通关密钥</h2>
+      <p style="color:#b0d0f0;">恭喜！你已成功完成该关卡命令配置！</p>
+      <div class="key-text" id="keyDisplay">PORT-SECURE-2024</div>
+      <button class="btn btn-primary" id="confirmBtn" style="margin-top:10px;">✔️ 我已通关</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const levels = [{
+        name: "最大MAC数",
+        description: "配置端口安全，设置最大MAC地址数为2。将命令块拖入对应槽位组合成完整命令。",
+        slotAnswers: [
+          ["enable"],
+          ["config termina"],
+          ["interface"],
+          ["fastEthernet 0/1"],
+          ["switchport", "mode", "access"],
+          ["switchport", "port-security"],
+          ["switchport", "port-security", "maximum 2"]
+        ],
+        distractors: ["mac-address", "0060.707E.D9A4", "sticky", "protect", "restrict", "shutdown", "violation"]
+      }, {
+        name: "静态MAC绑定",
+        description: "将MAC地址 0060.707E.D9A4 静态绑定到端口 fa0/1。",
+        slotAnswers: [
+          ["enable"],
+          ["config termina"],
+          ["interface"],
+          ["fastEthernet 0/1"],
+          ["switchport", "mode", "access"],
+          ["switchport", "port-security"],
+          ["switchport", "port-security", "mac-address", "0060.707E.D9A4"]
+        ],
+        distractors: ["maximum 2", "sticky", "protect", "restrict", "shutdown", "violation"]
+      }, {
+        name: "粘滞MAC绑定",
+        description: "启用粘滞学习，让交换机自动绑定第一个学到的MAC地址。",
+        slotAnswers: [
+          ["enable"],
+          ["config termina"],
+          ["interface"],
+          ["fastEthernet 0/1"],
+          ["switchport", "mode", "access"],
+          ["switchport", "port-security"],
+          ["switchport", "port-security", "mac-address", "sticky"]
+        ],
+        distractors: ["0060.707E.D9A4", "maximum 2", "protect", "restrict", "shutdown", "violation"]
+      }, {
+        name: "违规模式",
+        description: "根据场景选择正确的违规处理模式，拖入对应槽位。",
+        scenes: [
+          { desc: "场景1：只拦非法流量，需告警但不关闭端口", answer: "restrict" },
+          { desc: "场景2：只拦非法流量，不告警也不关闭端口", answer: "protect" },
+          { desc: "场景3：违规就关闭端口", answer: "shutdown" }
+        ],
+        slotAnswers: [
+          ["restrict"],
+          ["protect"],
+          ["shutdown"]
+        ],
+        distractors: ["violation", "switchport", "port-security"]
+      }];
+
+      let currentLevel = 0;
+      let slotContents = [];
+      let poolBlocksList = [];
+      let blockUsage = {};
+      let timerInterval = null;
+      let seconds = 0;
+      let score = 0;
+      let puzzleCompleted = false;
+      const PASS_KEY = "PORT-SECURE-PUZZLE-2024";
+
+      const levelNav = document.getElementById('levelNav');
+      const slotsContainer = document.getElementById('slotsContainer');
+      const blockPool = document.getElementById('blockPool');
+      const levelDescription = document.getElementById('levelDescription');
+      const timerDisplay = document.getElementById('timerDisplay');
+      const scoreDisplay = document.getElementById('scoreDisplay');
+      const sceneArea = document.getElementById('sceneArea');
+      const resetBtn = document.getElementById('resetBtn');
+      const modalOverlay = document.getElementById('modalOverlay');
+      const keyDisplay = document.getElementById('keyDisplay');
+      const confirmBtn = document.getElementById('confirmBtn');
+
+      function shuffleArray(arr) {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+      }
+
+      function stopTimer() {
+        if (timerInterval) { clearInterval(timerInterval);
+          timerInterval = null; }
+      }
+
+      function startTimer() {
+        stopTimer();
+        seconds = 0;
+        timerDisplay.textContent = formatTime(0);
+        timerInterval = setInterval(() => {
+          seconds++;
+          timerDisplay.textContent = formatTime(seconds);
+        }, 1000);
+      }
+
+      function updateScoreUI() {
+        scoreDisplay.textContent = score;
+      }
+
+      function generatePoolBlocks(level) {
+        const answerBlocks = [];
+        level.slotAnswers.forEach(slot => {
+          slot.forEach(block => answerBlocks.push(block));
+        });
+        const answerCount = {};
+        answerBlocks.forEach(b => {
+          answerCount[b] = (answerCount[b] || 0) + 1;
+        });
+        const poolBlocks = [];
+        Object.keys(answerCount).forEach(text => {
+          for (let i = 0; i < answerCount[text]; i++) {
+            poolBlocks.push(text);
+          }
+        });
+        if (level.distractors) {
+          level.distractors.forEach(d => poolBlocks.push(d));
+        }
+        return shuffleArray(poolBlocks);
+      }
+
+      function loadLevel(levelIndex) {
+        stopTimer();
+        currentLevel = levelIndex;
+        const level = levels[levelIndex];
+        puzzleCompleted = false;
+        score = 0;
+        updateScoreUI();
+        modalOverlay.classList.remove('show');
+        levelDescription.textContent = level.description;
+
+        document.querySelectorAll('.level-btn').forEach((btn, idx) => {
+          btn.classList.toggle('active', idx === levelIndex);
+        });
+
+        const slotCount = level.slotAnswers.length;
+        slotContents = new Array(slotCount).fill(null).map(() => []);
+
+        const rawPool = generatePoolBlocks(level);
+        poolBlocksList = rawPool.map((text, id) => ({ id, text }));
+        blockUsage = {};
+        poolBlocksList.forEach(b => { blockUsage[b.id] = false; });
+
+        renderSlots(slotCount, level);
+        renderBlockPool();
+        if (level.scenes) {
+          renderScenes(level.scenes);
+        } else {
+          sceneArea.innerHTML = '';
+        }
+        startTimer();
+      }
+
+      function renderSlots(count, level) {
+        slotsContainer.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'slot';
+          slot.setAttribute('data-slot-index', i);
+
+          if (level.scenes && level.scenes[i]) {
+            const sceneSpan = document.createElement('span');
+            sceneSpan.className = 'scene-desc';
+            sceneSpan.textContent = level.scenes[i].desc;
+            slot.appendChild(sceneSpan);
+          } else {
+            const numSpan = document.createElement('span');
+            numSpan.className = 'slot-number';
+            numSpan.textContent = (i + 1).toString().padStart(2, '0');
+            slot.appendChild(numSpan);
+          }
+
+          const placeholder = document.createElement('span');
+          placeholder.className = 'slot-placeholder';
+          placeholder.textContent = '⬜ 拖入命令块...';
+          slot.appendChild(placeholder);
+
+          slot.addEventListener('dragover', handleDragOver);
+          slot.addEventListener('dragleave', handleDragLeave);
+          slot.addEventListener('drop', handleDrop);
+          slotsContainer.appendChild(slot);
+        }
+      }
+
+      function renderScenes(scenes) {
+        sceneArea.innerHTML = scenes.map(s =>
+          `<div class="scene-desc" style="margin-bottom:3px;">📍 ${s.desc}</div>`
+        ).join('');
+      }
+
+      function renderBlockPool() {
+        blockPool.innerHTML = '<div class="pool-title">🧩 可用命令块（拖拽到左侧槽位）</div>';
+        poolBlocksList.forEach((b) => {
+          const block = document.createElement('div');
+          block.className = 'cmd-block';
+          block.textContent = b.text;
+          block.setAttribute('draggable', 'true');
+          block.setAttribute('data-block-id', b.id);
+          block.setAttribute('data-block-text', b.text);
+          if (blockUsage[b.id]) {
+            block.classList.add('used');
+            block.setAttribute('draggable', 'false');
+          }
+          block.addEventListener('dragstart', handleDragStart);
+          block.addEventListener('dragend', handleDragEnd);
+          blockPool.appendChild(block);
+        });
+      }
+
+      function refreshSlotDisplay(slotIndex) {
+        const slotElements = document.querySelectorAll('.slot');
+        if (slotIndex >= slotElements.length) return;
+        const slot = slotElements[slotIndex];
+        const contents = slotContents[slotIndex];
+
+        // 移除旧的chip和placeholder
+        const existingChips = slot.querySelectorAll('.chip');
+        existingChips.forEach(c => c.remove());
+        const placeholder = slot.querySelector('.slot-placeholder');
+        if (placeholder) placeholder.remove();
+
+        if (contents.length > 0) {
+          slot.classList.add('filled');
+          contents.forEach((blockText) => {
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.textContent = blockText;
+            const removeX = document.createElement('span');
+            removeX.className = 'remove-x';
+            removeX.textContent = '×';
+            removeX.title = '移除此块';
+            removeX.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const slotIdx = parseInt(slot.getAttribute('data-slot-index'));
+              const chipIdx = Array.from(slot.querySelectorAll('.chip')).indexOf(chip);
+              removeBlockFromSlot(slotIdx, chipIdx);
+            });
+            chip.appendChild(removeX);
+            slot.appendChild(chip);
+          });
+        } else {
+          slot.classList.remove('filled');
+          const placeholderNew = document.createElement('span');
+          placeholderNew.className = 'slot-placeholder';
+          placeholderNew.textContent = '⬜ 拖入命令块...';
+          slot.appendChild(placeholderNew);
+        }
+      }
+
+      function removeBlockFromSlot(slotIndex, chipIndex) {
+        if (chipIndex < 0 || chipIndex >= slotContents[slotIndex].length) return;
+        const removedText = slotContents[slotIndex][chipIndex];
+        slotContents[slotIndex].splice(chipIndex, 1);
+        syncBlockUsage();
+        refreshAllSlotsAndBlocks();
+      }
+
+      function syncBlockUsage() {
+        // 统计所有槽位中每种文本的使用次数
+        const usageCount = {};
+        slotContents.forEach(slot => {
+          slot.forEach(text => {
+            usageCount[text] = (usageCount[text] || 0) + 1;
+          });
+        });
+        // 先释放所有块
+        poolBlocksList.forEach(b => { blockUsage[b.id] = false; });
+        // 按需重新占用
+        const remaining = { ...usageCount };
+        poolBlocksList.forEach(b => {
+          if (remaining[b.text] > 0) {
+            blockUsage[b.id] = true;
+            remaining[b.text]--;
+          }
+        });
+      }
+
+      function refreshAllSlotsAndBlocks() {
+        const slotCount = levels[currentLevel].slotAnswers.length;
+        for (let i = 0; i < slotCount; i++) {
+          refreshSlotDisplay(i);
+        }
+        const poolBlocks = document.querySelectorAll('.cmd-block');
+        poolBlocks.forEach(block => {
+          const id = parseInt(block.getAttribute('data-block-id'));
+          if (blockUsage[id]) {
+            block.classList.add('used');
+            block.setAttribute('draggable', 'false');
+          } else {
+            block.classList.remove('used');
+            block.setAttribute('draggable', 'true');
+          }
+        });
+      }
+
+      let draggedBlockId = null;
+
+      function handleDragStart(e) {
+        const id = parseInt(this.getAttribute('data-block-id'));
+        if (blockUsage[id]) {
+          e.preventDefault();
+          return false;
+        }
+        draggedBlockId = id;
+        this.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', id.toString());
+        e.dataTransfer.effectAllowed = 'move';
+      }
+
+      function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        draggedBlockId = null;
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        // 确保drag-over样式只加在槽位本身
+        if (this.classList.contains('slot')) {
+          this.classList.add('drag-over');
+        }
+      }
+
+      function handleDragLeave(e) {
+        if (this.classList.contains('slot')) {
+          this.classList.remove('drag-over');
+        }
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        if (this.classList.contains('slot')) {
+          this.classList.remove('drag-over');
+        }
+        const rawId = e.dataTransfer.getData('text/plain');
+        if (!rawId) return;
+        const blockId = parseInt(rawId);
+        if (isNaN(blockId)) return;
+
+        // 找到对应块数据
+        const blockData = poolBlocksList.find(b => b.id === blockId);
+        if (!blockData) return;
+        const blockText = blockData.text;
+
+        // 检查块是否可用
+        if (blockUsage[blockId]) return;
+
+        const slotIndex = parseInt(this.getAttribute('data-slot-index'));
+        const level = levels[currentLevel];
+        const slotAnswer = level.slotAnswers[slotIndex];
+
+        // 检查该块是否属于此槽位
+        if (!slotAnswer.includes(blockText)) {
+          this.classList.add('error-shake');
+          setTimeout(() => this.classList.remove('error-shake'), 2000);
+          return;
+        }
+
+        // 检查该块在此槽位中是否已达到所需数量
+        const currentCount = slotContents[slotIndex].filter(t => t === blockText).length;
+        const neededCount = slotAnswer.filter(t => t === blockText).length;
+        if (currentCount >= neededCount) {
+          this.classList.add('error-shake');
+          setTimeout(() => this.classList.remove('error-shake'), 2000);
+          return;
+        }
+
+        // 接受块
+        blockUsage[blockId] = true;
+        slotContents[slotIndex].push(blockText);
+        score += 10;
+        updateScoreUI();
+        refreshAllSlotsAndBlocks();
+        this.classList.add('success-flash');
+        setTimeout(() => this.classList.remove('success-flash'), 600);
+        checkCompletion();
+      }
+
+      function checkCompletion() {
+        const level = levels[currentLevel];
+        const allCorrect = level.slotAnswers.every((answer, idx) => {
+          const contents = slotContents[idx];
+          if (contents.length !== answer.length) return false;
+          for (let i = 0; i < answer.length; i++) {
+            if (contents[i] !== answer[i]) return false;
+          }
+          return true;
+        });
+        if (allCorrect && !puzzleCompleted) {
+          puzzleCompleted = true;
+          stopTimer();
+          keyDisplay.textContent = PASS_KEY;
+          modalOverlay.classList.add('show');
+        }
+      }
+
+      function resetPuzzle() {
+        stopTimer();
+        const level = levels[currentLevel];
+        slotContents = new Array(level.slotAnswers.length).fill(null).map(() => []);
+        poolBlocksList.forEach(b => { blockUsage[b.id] = false; });
+        score = 0;
+        updateScoreUI();
+        puzzleCompleted = false;
+        modalOverlay.classList.remove('show');
+        renderSlots(level.slotAnswers.length, level);
+        renderBlockPool();
+        if (level.scenes) renderScenes(level.scenes);
+        startTimer();
+      }
+
+      levelNav.addEventListener('click', (e) => {
+        if (e.target.classList.contains('level-btn')) {
+          const levelIdx = parseInt(e.target.getAttribute('data-level'));
+          loadLevel(levelIdx);
+        }
+      });
+
+      resetBtn.addEventListener('click', resetPuzzle);
+      confirmBtn.addEventListener('click', () => modalOverlay.classList.remove('show'));
+
+      loadLevel(0);
+    })();
+  </script>
+</body>
+</html>
